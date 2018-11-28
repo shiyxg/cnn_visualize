@@ -1,0 +1,50 @@
+\documentclass[UTF8]{article}
+% \usepackage{xeCJK}
+\usepackage[margin=1in]{geometry}
+\usepackage{cite}
+\usepackage{ctex}
+\usepackage{authblk}
+\usepackage{siunitx}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{hyperref}
+
+\author{石永祥}
+\affil{Peking University, Geophysics\\ Email: shiyxg@163.com}
+%\mail
+\date{}
+\title{卷积神经网络可视化算法实现日志}
+\begin{document}  
+\maketitle
+\section{问题简述}
+卷积神经网络方法在断层识别上的应用，已经取得了较好的效果，但是之后的工作一直是在FCN等一系列方式上进行的。CNN网络的一些操作一直没有晚上，还是一年前的种种操作。在这里希望在之前的网络基础山，做一些简单的优化，查看一下识别的效果。而且做一个完整的识别可视化，包括使用反卷积(\cite{deconvnet})与另一种方法(\cite{reversion})\par
+下面是对所有训练出的参数的记录日志：
+\begin{itemize}
+	\item[test01]test01下出来的效果不是很好，可能是因为batch——size太大或者add太小
+	\item[test02]把batchSize变小，大师add没变，结果显示全部识别为了0
+	\item[test03]调大了batchSize，add增加了0.1，结果就好多了
+\end{itemize}
+
+\section{DeconvNet}
+有一个非常重要的点，反卷积的卷积核，到底如何获得？输入输出通道的倒置？那么另一种说法的横向倒置？或许是用于类似于卷积的方式实现反卷积吧、这一点没有弄明白，可以去参照一下原本的文章.
+
+
+\section{Reversion}
+看明白了，之后尝试一下。但是关键在于，他们可视化的网络只是一个识别问题，我们的网络还包含一个识别位置信息的部分，这一点可能会造成很大的问题。\par
+
+总结一下这种可视化方式的算法：基本思想是，在网络结构确定(假定将这个关系表述为$\Gamma$）的情况下，假定输入时x,想要得知某个神经元所对应的x，可以通过梯度上升的基础上让神经元的值$\alpha_i(x)$最大，与物理问题中的反演类似，所以我称之为反演。\par
+从反演的思路理解，那么基本过程可以变成：$x =x+\eta\frac{\partial\alpha_i}{\partial x}$的不断迭代的过程。但是想要生成可以使用的图片，需要有一定的优化算法：\par
+
+\begin{itemize}
+	\item decay: $x =(x+\eta\frac{\partial\alpha_i}{\partial x})\times (1-decay)$。我的理解是这种算法会逐渐削弱初始状态的影响，最终趋于一个稳定值，好处是可以快速收敛，最终只与梯度有关，而不会受初始随机状态的影响出现一堆乱码（有效信号被覆盖）。
+	\item smooth: $x = Filter(x+\eta\frac{\partial\alpha_i}{\partial x})$。做平滑，是基于实际图像不会存在剧烈的震荡的假设做出
+	\item clipping1: $x[where(\left|x\right|<0.001)]=0$ 将x中小值直接删除置零
+	\item clipping2: $x[where(\left|x\frac{\partial\alpha_i}{\partial x}\right|<0.001)]=0$将x中对结果贡献小的部分，直接置零，方便获得$\alpha_i$的敏感区域
+\end{itemize}
+需要注意的是，每一个神经元对应的最大值输入时多解的，我们只是通过这种反演的方法获得这个神经元对应的一类图像，但是是无法获知\textbf{为什么}神经元对这一类图像敏感的。\par
+
+反演出对应的图像一般有两类，一类是针对卷积神经网络的卷积层。
+% \bibliographystyle{abbrv}
+% \bibliography{references}
+\end{document} 
