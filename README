@@ -1,0 +1,9 @@
+how to use:
+train.py:
+    train the graph of cnn and save para
+graph.py:
+    build different for different visualization methods
+visualize.py:
+    visualize the cnn by deconv, reversion methods from the following paper:
+    http://yosinski.com/media/papers/Yosinski__2015__ICML_DL__Understanding_Neural_Networks_Through_Deep_Visualization__.pdf
+
