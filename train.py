@@ -36,6 +36,7 @@ def learn_rate(accuracy, loss, i):
 
 
 def visual(data, sess, name, shape, graph):
+    # it costs a long time to do
     [XL, YL, TL] = data.shape
     expand = data.expand
     layerIndex = [YL // 2]
@@ -199,7 +200,7 @@ def train(trainPath, testPath, validPath):
 
 
 def save_para():
-    ## build a graph
+    ## save para of TF to npy
     LR_i = 1e-3
     batch_i = 20
     add = 0.3
@@ -211,6 +212,7 @@ def save_para():
     print('built Graph')
     with tf.Session(graph=g.graph) as sess:
         pwd = 'C:/Users/shiyx/Documents/ML_log/CNN_visual/test01'
+        # the path to store npy file:pwd+/para_npy
         sess.run(tf.global_variables_initializer())
         saver = tf.train.Saver()
         saver.restore(sess,'C:/Users/shiyx/Documents/ML_log/CNN_visual/test01/para/')

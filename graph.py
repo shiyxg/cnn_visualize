@@ -6,6 +6,7 @@ from unit.NN import nn_layer
 from unit.pool import *
 
 
+# the following is to build a CNN graph of TF to train
 class TrainGraph:
     def __init__(self, input_shape=[64, 64, 1]):
         self.graph = tf.Graph()
@@ -21,6 +22,7 @@ class TrainGraph:
 
     def build_graph(self, NUM):
         with self.graph.as_default():
+            # INPUT
             INPUT_SHAPE = self.INPUT_SHAPE
             with tf.name_scope('ImagesLabels'):
                 images = tf.placeholder(tf.float32, shape=[None, INPUT_SHAPE[0], INPUT_SHAPE[1], INPUT_SHAPE[2]])
@@ -34,12 +36,14 @@ class TrainGraph:
             conf2 = {'filterSize': None, 'outputChn': None, 'strideSize':[1]}
             with tf.name_scope('normalize'):
                 x = BN(images, conf1)
+            # layer1
             with tf.name_scope('conv1'):
                 conf2['filterSize'] = [3]
                 conf2['outputChn'] = 32
                 x = conv2d(x, conf2)
                 x = BN(x, conf1)
                 x = tf.nn.relu(x)
+            # layer2
             with tf.name_scope('conv2'):
                 conf2['filterSize'] = [3]
                 conf2['outputChn'] = 32
@@ -117,7 +121,9 @@ class TrainGraph:
             self.train = train
             self.para = [loss, result, summary]
 
-
+'''
+the following graph is build a deconvNet of CNN or other conv network
+'''
 class DeconvGraph:
     def __init__(self, input_shape, para_pwd=None):
         self.graph = tf.Graph()
@@ -130,7 +136,10 @@ class DeconvGraph:
         self.para = []
         self.is_training = None
         self.conv_result = []
+
+        # this item will decide which conv layer will be the last one in deconvNet
         self.deconv_item=None
+
         if para_pwd is not None:
             pass
 
@@ -165,6 +174,7 @@ class DeconvGraph:
                 x = self.BN(x, 2)
                 x = tf.nn.relu(x)
                 self.conv_result.append(x)
+            # use max_argmax to unpool
             x, index = max_pool_argmax(x, {'name': 'pool1'})
             self.pool.append(index)
 
@@ -198,6 +208,7 @@ class DeconvGraph:
             x = max_unpool_2d(x, self.pool[-1], {'name': 'unpool4', 'output_shape': [h//2//2//2, w//2//2//2]})
 
             if self.deconv_item == 5:
+                # the last layer of deconvNet is layer5
                 x = self.conv_result[-1]
             with tf.name_scope('deconv5'):
                 x = self.re_BN(x, 5)
@@ -207,6 +218,7 @@ class DeconvGraph:
             x = max_unpool_2d(x, self.pool[-2], {'name': 'unpool3', 'output_shape': [h//2//2, w//2//2]})
 
             if self.deconv_item == 4:
+                # the last layer of deconvNet is layer4
                 x = self.conv_result[-2]
             with tf.name_scope('deconv4'):
                 x = self.re_BN(x, 4)
@@ -216,6 +228,7 @@ class DeconvGraph:
             x = max_unpool_2d(x, self.pool[-3], {'name': 'unpool2', 'output_shape': [h // 2, w // 2]})
 
             if self.deconv_item == 3:
+                # the last layer of deconvNet is layer3
                 x = self.conv_result[-3]
             with tf.name_scope('deconv3'):
                 x = self.re_BN(x, 3)
@@ -225,6 +238,7 @@ class DeconvGraph:
             x = max_unpool_2d(x,self.pool[-4], {'name': 'unpool1', 'output_shape': [h, w]})
 
             if self.deconv_item == 2:
+                # the last layer of deconvNet is layer2
                 x = self.conv_result[-4]
             with tf.name_scope('deconv2'):
                 x = self.re_BN(x, 2)
@@ -233,6 +247,7 @@ class DeconvGraph:
                 x = tf.nn.conv2d(x, a, strides=[1, 1, 1, 1], padding='SAME')
 
             if self.deconv_item == 1:
+                # the last layer of deconvNet is layer1
                 x = self.conv_result[-5]
             with tf.name_scope('deconv1'):
                 x = self.re_BN(x, 1)
@@ -251,6 +266,7 @@ class DeconvGraph:
             params_shape = x.shape.as_list()[-1]
             axis = list(range(len(x.shape.as_list()) - 1))  # 得到需要计算batch的部分，除了最后一个维度不进行
             print(index)
+            # do BN use the stored shift and scale and mean and var
             shift = tf.Variable(self.bn[index][0, :].astype('float32'), name='beta', trainable=False)
             scale = tf.Variable(self.bn[index][1, :].astype('float32'), name='gamma', trainable=False)
             moving_mean = tf.Variable(self.bn[index][2, :], trainable=False, name='moving_mean')
@@ -270,6 +286,7 @@ class DeconvGraph:
         return result
 
     def re_BN(self, x, index):
+        # it is useless for DeconvNet, deconvNet can not do any re_BN in the process of deconv
         return x
         with tf.name_scope('re_BN'):
             params_shape = x.shape.as_list()[-1]
@@ -288,6 +305,8 @@ class DeconvGraph:
         return result
 
 
+# the ReGraph is build to build a graph of reversion method:
+# http://yosinski.com/deepvis
 class ReGraph:
     def __init__(self, para_pwd=None):
         self.graph = tf.Graph()
@@ -391,6 +410,7 @@ class ReGraph:
                 x = tf.nn.relu(x)
 
             x = tf.nn.softmax(x)
+            # decide which neuron will be reversed
             label_f = tf.slice(x, [0, 0], [1, 1])
             print(x.shape)
             print(label_f.shape)
@@ -426,7 +446,7 @@ class ReGraph:
                                                variance_epsilon=BN_EPSILON)
         return result
 
-
+# build the Graph of conv layer
 class ReGraph_conv:
     def __init__(self, para_pwd=None):
         self.graph = tf.Graph()
@@ -441,16 +461,22 @@ class ReGraph_conv:
         self.deconv_item=None
         self.bias = []
         self.weight = []
+        self.shape = {1:[3,3], 2:[5,5], 3:[10,10], 4:[20,20],5:[40,40]}
+        self.chn = {1:32, 2:32, 3:64, 4:128,5:256}
         if para_pwd is not None:
             pass
 
     def build_graph(self, layer):
+
+        # layer means the wanted layer to inversion
         if self.cores==[] or self.bn==[] or self.bias==[] or self.weight==[]:
             raise ValueError('NO INIT VALUE')
 
         with self.graph.as_default():
-            shape={1:[3,3], 2:[5,5], 3:[10,10], 4:[20,20],5:[40,40]}
-            chn = {1:32, 2:32, 3:64, 4:128,5:256}
+            # decide the shape of input for different conv layer
+            shape=self.shape
+            # decide the chn of different input
+            chn = self.chn
             h, w = shape[layer]
             with tf.name_scope('ImagesLabels'):
                 # init = np.reshape(np.random.uniform(-1, 1, size=INPUT_SHAPE).astype('float32'), [1, h, w, 1])
@@ -533,6 +559,7 @@ class ReGraph_conv:
     def BN(self, x, index):
         with tf.name_scope('BN'):
             params_shape = x.shape.as_list()[-1]
+            # make the stored para to BN
             axis = list(range(len(x.shape.as_list()) - 1))  # 得到需要计算batch的部分，除了最后一个维度不进行
             print(index)
             shift = tf.Variable(self.bn[index][0, :].astype('float32'), name='beta', trainable=False)

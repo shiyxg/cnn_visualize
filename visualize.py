@@ -28,6 +28,7 @@ def deconvnet():
     for i in range(6):
         bn_i= np.load(para_path+'bn_%s.npy'%i)
         g.bn.append(bn_i)
+
     g.deconv_item = 5
 
     g.build_graph()
@@ -97,6 +98,7 @@ def reversion():
         weight_i = np.load(para_path + 'weight_%s.npy' % i)
         g.bias.append(bias_i)
         g.weight.append(weight_i)
+
     g.build_graph()
     ## train
     # data = niiS(trainPath, testPath)
@@ -160,6 +162,7 @@ def reversion():
 
 
 def reversion_conv():
+    # do reversion for conv layers
     LR_i = 1e-3
     batch_i = 1
     add = 0.01
@@ -176,17 +179,20 @@ def reversion_conv():
         [4, 16, 26, 16, 4],
         [1, 4, 7, 4, 1]
     ])
-    shape = {1: [3, 3], 2: [5, 5], 3: [10, 10], 4: [20, 20], 5: [40, 40]}
-    chn = {1: 32, 2: 32, 3: 64, 4: 128, 5: 256}
     kernel_3x1 = np.array([1,2,1]).reshape([3,1])
     kernel_3x5 = np.dot(np.array([1,2,1]).reshape([3,1]),np.array([1,4,7,4,1]).reshape(1,5)).T
     kernel_3x2 = np.dot(np.array([1,2,1]).reshape([3,1]),np.array([1,1]).reshape(1,2))
+    # decide which kernel to smooth
     kernel = kernel_3x3
     kernel = kernel / kernel.sum()  # 加权平均
+
     para_path = 'C:/Users/shiyx/Documents/ML_log/CNN_visual/test01/para_npy/'
     # para_path = 'C:/Users/shiyx/Documents/ML_log/CNN_visual/02/para_npy/'
     g = ReGraph_conv()
+    shape = g.shape
+    chn = g.chn
 
+    # give the graph of stored npy file
     for i in range(5):
         cores_i = np.load(para_path + 'cores_%s.npy' % i)
         g.cores.append(cores_i)
@@ -209,6 +215,7 @@ def reversion_conv():
         pwd = 'C:/Users/shiyx/Documents/ML_log/CNN_visual/test01/samples'
         # wave = np.load('C:\\Users\shiyx\Documents\ML_log\CNN_visual\\test01\\train\FCN1_OA3_f10_n10_250000_data.npy')
         sess.run(tf.global_variables_initializer())
+        # different init_method
         images = np.random.uniform(-3, 3, size=[chn[layer], shape[layer][0], shape[layer][0], 1]).astype('float32')
         # images = np.reshape(wave[32:96, 32:96].astype('float32'), [1,64,64,1])
         # images = np.load(pwd+'/un_1.npy')
@@ -220,6 +227,7 @@ def reversion_conv():
             xx = []
             x = []
             for i in range(chn[layer]):
+                # do iter for all images of all chns
                 image_chn_i = images[i, :, :, :].reshape([1, shape[layer][0], shape[layer][0], 1]).astype('float32')
                 feedData = {g.feed[0]:image_chn_i, g.feed[1]: True}
                 fetchVariables = [g.para[0][i], g.para[1]]
@@ -231,13 +239,16 @@ def reversion_conv():
                 gradient = gradient[0]
                 xx.append(gradient)
                 x.append(result[0, i])
-                dis = np.abs(image_chn_i * gradient)
+                dis = np.abs(image_chn_i * gradient) # distribution of image
+
+                # decay method and step=50
                 image_chn_i = (image_chn_i + 50 * gradient)*0.9
                 # cut small pixel
                 # images[np.where(np.abs(images) <= images.max()/100)]=0
+
                 # cut smal distribute
                 image_chn_i[np.where(dis <= dis.mean() / 50)] = 0
-                # guass
+                # guass smooth
                 images[i, :, :, :] = convolve2d(image_chn_i[0, :, :, 0], kernel, mode='same').reshape(
                     [shape[layer][0], shape[layer][0], 1]).astype('float32')
                 # images[i, :, :, :] = image_chn_i[0, :, :, 0].reshape(
